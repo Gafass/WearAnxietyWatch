@@ -1,0 +1,11 @@
+# Revisión por el responsable del repositorio.
+* @Gafass
+
+# Superficies con mayor impacto de seguridad.
+/.github/ @Gafass
+/apps/wear/src/main/AndroidManifest.xml @Gafass
+/apps/wear/src/main/java/com/anxietywatch/wear/sensor/ @Gafass
+/apps/wear/src/main/java/com/anxietywatch/wear/storage/ @Gafass
+/services/api/ @Gafass
+/docs/security/ @Gafass
+/SECURITY.md @Gafass

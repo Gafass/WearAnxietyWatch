@@ -2,61 +2,122 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   node:
+    name: Node · build, test, lint y formato
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run test
-      - run: npm run lint
+      - name: Instalar dependencias reproducibles
+        run: npm ci
+      - name: Compilar
+        run: npm run build
+      - name: Ejecutar pruebas
+        run: npm run test
+      - name: Ejecutar lint
+        run: npm run lint
+      - name: Verificar formato
+        run: npm run format:check
 
   wear:
+    name: Wear OS · pruebas, lint y APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preparar Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
-      - uses: android-actions/setup-android@v3
-      - run: chmod +x gradlew
-      - run: ./gradlew :apps:wear:assembleDebug
+      - name: Preparar Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - name: Habilitar Gradle Wrapper
+        run: chmod +x gradlew
+      - name: Validar aplicación Wear OS
+        run: ./gradlew --no-daemon :apps:wear:testDebugUnitTest :apps:wear:lintDebug :apps:wear:assembleDebug
 
   mobile-android:
+    name: Android móvil · pruebas, lint y APK
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: npm
-      - uses: actions/setup-java@v4
+      - name: Preparar Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
-      - uses: android-actions/setup-android@v3
-      - run: npm ci
-      - run: npm run test --workspace @anxietywatch/mobile -- --runInBand
-      - run: chmod +x apps/mobile/android/gradlew
-      - run: ./apps/mobile/android/gradlew -p apps/mobile/android assembleDebug
+          cache-dependency-path: |
+            apps/mobile/android/*.gradle
+            apps/mobile/android/gradle.properties
+            apps/mobile/android/gradle/wrapper/gradle-wrapper.properties
+      - name: Preparar Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - name: Instalar dependencias reproducibles
+        run: npm ci
+      - name: Ejecutar pruebas móviles
+        run: npm run test --workspace @anxietywatch/mobile -- --runInBand
+      - name: Habilitar Gradle Wrapper
+        run: chmod +x apps/mobile/android/gradlew
+      - name: Validar aplicación Android
+        run: ./apps/mobile/android/gradlew -p apps/mobile/android --no-daemon lintDebug assembleDebug
 
   ml:
+    name: Python · pruebas
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preparar Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
           cache: pip
-      - run: python -m pip install -e "./services/ml[dev]"
-      - run: python -m pytest services/ml
+          cache-dependency-path: services/ml/pyproject.toml
+      - name: Actualizar instalador Python
+        run: python -m pip install --disable-pip-version-check pip==26.1.2
+      - name: Instalar dependencias
+        run: python -m pip install --disable-pip-version-check -e "./services/ml[dev]"
+      - name: Ejecutar pruebas
+        run: python -m pytest services/ml

@@ -90,6 +90,19 @@ Set-Location apps\mobile\android
 - La ubicación no se solicitará hasta que exista consentimiento y un flujo SOS.
 - EDA permanece no compatible para Galaxy Watch7.
 
+## DevSecOps
+
+- CI obligatorio para build, pruebas, lint y formato.
+- CodeQL para TypeScript, Kotlin/Java y Python.
+- Auditoría de dependencias npm/Python, Dependency Review y Dependabot.
+- SBOM SPDX generado desde `package-lock.json`.
+- GitHub Actions con permisos mínimos y referencias fijadas a SHA completo.
+- Reporte privado de vulnerabilidades mediante [`SECURITY.md`](SECURITY.md).
+
+Consulta la [línea base de seguridad](docs/security/README.md), el
+[registro de riesgos aceptados](docs/security/RISK_ACCEPTANCE.md) y la
+[guía de contribución](CONTRIBUTING.md).
+
 ## Criterios de aceptación de la base
 
 - Los tres clientes tienen una entrada compilable.

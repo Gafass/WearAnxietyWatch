@@ -19,6 +19,8 @@
     "lint": "eslint apps/web/src services/api/src packages/contracts/src && npm run lint --workspace @anxietywatch/mobile",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "security:audit": "node scripts/security/npm-audit.mjs",
+    "security:sbom": "npm sbom --package-lock-only --sbom-format=spdx --sbom-type=application",
     "dev:api": "npm run dev --workspace @anxietywatch/api",
     "dev:web": "npm run dev --workspace @anxietywatch/web",
     "dev:mobile": "npm run start --workspace @anxietywatch/mobile"
