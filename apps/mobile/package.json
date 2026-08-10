@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@anxietywatch/contracts": "file:../../packages/contracts",
-    "react": "19.2.3",
+    "react": "19.2.8",
     "react-native": "0.84.0"
   },
   "devDependencies": {
