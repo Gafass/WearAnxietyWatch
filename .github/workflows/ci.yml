@@ -97,6 +97,17 @@ jobs:
         run: npm run test --workspace @anxietywatch/mobile -- --runInBand
       - name: Habilitar Gradle Wrapper
         run: chmod +x apps/mobile/android/gradlew
+      - name: Generar keystore efímero de depuración
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore apps/mobile/android/app/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
       - name: Validar aplicación Android
         run: ./apps/mobile/android/gradlew -p apps/mobile/android --no-daemon lintDebug assembleDebug
 
