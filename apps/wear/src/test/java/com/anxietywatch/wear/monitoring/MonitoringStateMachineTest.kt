@@ -16,6 +16,23 @@ class MonitoringStateMachineTest {
     }
 
     @Test
+    fun `activity confirmation enters cooldown and never intervention`() {
+        val machine = MonitoringStateMachine()
+        machine.onDetection(MonitoringState.USER_VALIDATION)
+
+        assertEquals(MonitoringState.COOLDOWN, machine.onUserResponse(UserResponse.ACTIVITY_CONFIRMED))
+        assertEquals(MonitoringState.COOLDOWN, machine.state)
+    }
+
+    @Test
+    fun `support request enters intervention`() {
+        val machine = MonitoringStateMachine()
+        machine.onDetection(MonitoringState.USER_VALIDATION)
+
+        assertEquals(MonitoringState.INTERVENTION, machine.onUserResponse(UserResponse.SUPPORT_REQUESTED))
+    }
+
+    @Test
     fun `manual SOS requires an explicit second confirmation`() {
         val machine = MonitoringStateMachine()
 

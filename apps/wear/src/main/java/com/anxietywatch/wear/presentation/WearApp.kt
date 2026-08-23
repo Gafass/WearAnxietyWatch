@@ -51,6 +51,7 @@ import com.anxietywatch.wear.runtime.WearScreen
 import com.anxietywatch.wear.runtime.WearUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 
 @Composable
 fun AnxietyWatchApp(
@@ -228,19 +229,22 @@ private fun BreathingScreen(state: WearUiState, runtime: WearRuntime) {
     )
 
     LaunchedEffect(Unit) {
-        while (cycles < 3) {
-            phase = BreathPhase.INHALE
-            seconds = 4
-            runtime.haptics.inhale()
-            repeat(4) { delay(1_000); seconds -= 1 }
-            phase = BreathPhase.EXHALE
-            seconds = 4
-            runtime.haptics.exhale()
-            repeat(4) { delay(1_000); seconds -= 1 }
-            cycles += 1
+        try {
+            while (isActive && cycles < 3) {
+                phase = BreathPhase.INHALE
+                seconds = 4
+                runtime.haptics.inhale()
+                repeat(4) { delay(1_000); seconds -= 1 }
+                phase = BreathPhase.EXHALE
+                seconds = 4
+                runtime.haptics.exhale()
+                repeat(4) { delay(1_000); seconds -= 1 }
+                cycles += 1
+            }
+            if (isActive) phase = BreathPhase.COMPLETE
+        } finally {
+            runtime.haptics.cancel()
         }
-        phase = BreathPhase.COMPLETE
-        runtime.haptics.cancel()
     }
 
     BoxWithConstraints(
@@ -308,8 +312,7 @@ private fun BreathingScreen(state: WearUiState, runtime: WearRuntime) {
             }
             MiniAction("Necesito ayuda") { runtime.navigate(WearScreen.SOS_CONFIRM) }
             MiniAction("Detener") {
-                runtime.haptics.cancel()
-                runtime.navigate(WearScreen.MONITORING)
+                runtime.respond(UserResponse.BREATHING_HELPED)
             }
         }
     }
