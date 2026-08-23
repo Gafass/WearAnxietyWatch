@@ -34,7 +34,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +41,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class WearRuntime(context: Context) {
@@ -69,6 +69,8 @@ class WearRuntime(context: Context) {
     private var statusJob: Job? = null
     private var activeEvent: PendingEvent? = null
     private val processing = AtomicBoolean(false)
+    private val stateMutex = kotlinx.coroutines.sync.Mutex()
+    private val monitoringLifecycle = ForegroundMonitoringLifecycle()
 
     init {
         refreshStaticState()
@@ -78,7 +80,9 @@ class WearRuntime(context: Context) {
     }
 
     fun startForegroundMonitoring() {
+        if (!monitoringLifecycle.onStart()) return
         if (!PermissionPolicy.hasForegroundHeartRate(appContext)) {
+            monitoringLifecycle.onStop()
             mutableState.value = mutableState.value.copy(
                 screen = WearScreen.PERMISSIONS,
                 heartRateStatus = CapabilityStatus.PERMISSION_REQUIRED,
@@ -113,11 +117,12 @@ class WearRuntime(context: Context) {
     }
 
     fun stopForegroundMonitoring() {
-        scope.launch {
-            monitoringJob?.cancelAndJoin()
-            monitoringJob = null
-            haptics.cancel()
-        }
+        monitoringLifecycle.onStop()
+        monitoringJob?.cancel()
+        monitoringJob = null
+        statusJob?.cancel()
+        statusJob = null
+        haptics.cancel()
     }
 
     fun onPermissionsResult() {
@@ -187,31 +192,35 @@ class WearRuntime(context: Context) {
     }
 
     fun respond(response: UserResponse) {
-        notifier.clearPossibleEvent()
-        val next = stateMachine.onUserResponse(response)
-        updateActiveEvent(next, response)
-        val screen = when (next) {
-            MonitoringState.INTERVENTION -> WearScreen.BREATHING
-            MonitoringState.SECOND_VALIDATION -> WearScreen.VALIDATION
-            MonitoringState.COOLDOWN -> WearScreen.FINISHED
-            MonitoringState.RESOLVED -> WearScreen.FINISHED
-            MonitoringState.SOS_PENDING -> WearScreen.SOS_COUNTDOWN
-            else -> mutableState.value.screen
+        scope.launch {
+            stateMutex.withLock {
+                notifier.clearPossibleEvent()
+                val next = stateMachine.onUserResponse(response)
+                updateActiveEvent(next, response)
+                val screen = when (next) {
+                    MonitoringState.INTERVENTION -> WearScreen.BREATHING
+                    MonitoringState.SECOND_VALIDATION -> WearScreen.VALIDATION
+                    MonitoringState.COOLDOWN -> WearScreen.FINISHED
+                    MonitoringState.RESOLVED -> WearScreen.FINISHED
+                    MonitoringState.SOS_PENDING -> WearScreen.SOS_COUNTDOWN
+                    else -> mutableState.value.screen
+                }
+                mutableState.value = mutableState.value.copy(
+                    monitoringState = next,
+                    screen = screen,
+                    message = when (response) {
+                        UserResponse.ACTIVITY_CONFIRMED -> "Actividad registrada; no se interpreta como evento."
+                        UserResponse.USER_OK -> "Respuesta guardada."
+                        UserResponse.SUPPORT_REQUESTED -> "Iniciemos una técnica de apoyo."
+                        UserResponse.NO_RESPONSE -> "Segunda comprobación."
+                        UserResponse.BREATHING_HELPED -> "Sesión finalizada."
+                        UserResponse.SOS_REQUESTED -> "Confirma o cancela el SOS."
+                        UserResponse.SOS_CANCELLED -> "SOS cancelado."
+                    },
+                )
+                if (next == MonitoringState.COOLDOWN || next == MonitoringState.RESOLVED) scheduleCooldown()
+            }
         }
-        mutableState.value = mutableState.value.copy(
-            monitoringState = next,
-            screen = screen,
-            message = when (response) {
-                UserResponse.ACTIVITY_CONFIRMED -> "Actividad registrada; no se interpreta como evento."
-                UserResponse.USER_OK -> "Respuesta guardada."
-                UserResponse.SUPPORT_REQUESTED -> "Iniciemos una técnica de apoyo."
-                UserResponse.NO_RESPONSE -> "Segunda comprobación."
-                UserResponse.BREATHING_HELPED -> "Sesión finalizada."
-                UserResponse.SOS_REQUESTED -> "Confirma o cancela el SOS."
-                UserResponse.SOS_CANCELLED -> "SOS cancelado."
-            },
-        )
-        if (next == MonitoringState.COOLDOWN || next == MonitoringState.RESOLVED) scheduleCooldown()
     }
 
     fun startManualSos() {
@@ -383,8 +392,7 @@ class WearRuntime(context: Context) {
 
     private fun restartMonitoring() {
         scope.launch {
-            monitoringJob?.cancelAndJoin()
-            monitoringJob = null
+            stopForegroundMonitoring()
             startForegroundMonitoring()
         }
     }
