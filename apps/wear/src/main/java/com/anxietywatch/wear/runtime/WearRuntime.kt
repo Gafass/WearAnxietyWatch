@@ -102,11 +102,11 @@ class WearRuntime(context: Context) {
             } else {
                 healthServicesProvider
             }
-            updateCapabilities(heartProvider)
             mutableState.value = mutableState.value.copy(
                 screen = WearScreen.MONITORING,
                 message = if (simulated) "Datos simulados activos" else "Monitoreo activo",
             )
+            updateCapabilities(heartProvider)
             merge(heartProvider.readings(), if (simulated) kotlinx.coroutines.flow.emptyFlow() else motionProvider.readings())
                 .catch { error ->
                     mutableState.value = mutableState.value.copy(
@@ -211,9 +211,7 @@ class WearRuntime(context: Context) {
         scope.launch {
             stateMutex.withLock {
                 notifier.clearPossibleEvent()
-                persistPrimaryDecisionIfNeeded(response)
                 val next = stateMachine.onUserResponse(response)
-                updateActiveEvent(next, response)
                 val screen = when (next) {
                     MonitoringState.INTERVENTION -> WearScreen.BREATHING
                     MonitoringState.SECOND_VALIDATION -> WearScreen.VALIDATION
@@ -235,6 +233,8 @@ class WearRuntime(context: Context) {
                         UserResponse.SOS_CANCELLED -> "SOS cancelado."
                     },
                 )
+                persistPrimaryDecisionIfNeeded(response)
+                updateActiveEvent(next, response)
                 if (next == MonitoringState.COOLDOWN || next == MonitoringState.RESOLVED) scheduleCooldown()
             }
         }
