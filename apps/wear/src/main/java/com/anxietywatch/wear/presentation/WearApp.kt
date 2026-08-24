@@ -416,7 +416,6 @@ private fun SettingsScreen(state: WearUiState, runtime: WearRuntime) {
         CapabilityLine("Frecuencia", state.heartRateStatus)
         CapabilityLine("Acelerómetro", state.accelerometerStatus)
         CapabilityLine("IBI", state.ibiStatus, state.ibiDetail)
-        CapabilityLine("EDA", CapabilityStatus.UNSUPPORTED, state.edaDetail)
         Text("Pendientes: ${state.pendingSamples}", color = WearDesign.TextMuted, fontSize = 11.sp)
         Text(
             "Lectura actual: ${state.heartRateBpm?.let { "$it BPM" } ?: "esperando señal"}",
